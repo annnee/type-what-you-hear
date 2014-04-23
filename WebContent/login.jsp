@@ -17,22 +17,26 @@
 }
 </Style>
 
-<title>Dissertation</title>
-
+<title>Login</title>
 </head>
+<%
+if (session.getAttribute("username") != null) {
+	response.sendRedirect("welcome.jsp");
+} 
+else {
+%>
 <body>
 	 <div class="site-wrapper">
 
       <div class="site-wrapper-inner">
 
         <div class="cover-container">
-
+		
           <div class="masthead clearfix">
             <div class="inner">
               <h3 class="masthead-brand"><span class="glyphicon glyphicon-headphones"></span> Listen, Listen!</h3>
               <ul class="nav masthead-nav">
                 <li><a href="index.jsp">Home</a></li>
-                <li><a href="#">Project Description</a></li>
                 <li class="active"><a href="login.jsp">Login</a></li>
               </ul>
             </div>
@@ -40,12 +44,12 @@
 
           <div class="inner cover">
              <form class="form-signin" role="form" name="login" method="post" action="Servlet">
-		        <h2 class="form-signin-heading">Please sign in</h2>
+		        <h2 class="form-signin-heading">Log In</h2>
 		        <input type="hidden" name="formType" value="login">
-		        <input type="email" name="email" class="form-control" placeholder="Email address" required autofocus>
+		        <input type="text" name="username" class="form-control" placeholder="Username" required>
 		        <input type="password" name="password" class="form-control" placeholder="Password" required>
 		        <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
-		        <p><a href="register.jsp">Don't have an account? Register.</a></p>
+		        <p><a href="register.jsp">Register</a></p>
 		      </form>
 		      <p>${message}</p>
           </div>
@@ -55,27 +59,14 @@
               <p>Built with <a href="http://getbootstrap.com">Bootstrap</a>, inspired by <a href="https://twitter.com/mdo">@mdo</a>.</p>
             </div>
           </div>
-
         </div>
-
       </div>
-
     </div>
 	<!--Javscript -->
 	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 	<script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
-	<script>
-	/*$(document).ready(function() {
-		$("#login").submit(function(event){
-			event.preventDefault();
-			var formData = $( "#login" ).serialize();
-			$.post('Servlet', formData, function(responseText){
-				
-			}).fail(function(){
-				alert("error encountered");
-			});
-		});
-	});*/
-	</script>
+<%
+	}
+%>
 </body>
 </html>

@@ -9,6 +9,21 @@
 <!-- Latest compiled and minified CSS -->
 <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
 <link rel="stylesheet" href="http://getbootstrap.com/examples/cover/cover.css">
+<Style type="text/css">
+.popover {
+ 	width: 330px;
+}
+
+p.reg-link {
+	text-align: center;
+	
+}
+
+a.register {
+	color:#333;
+}
+
+</Style>
 <title>Listen, Listen!</title>
 
 </head>
@@ -23,19 +38,33 @@
             <div class="inner">
               <h3 class="masthead-brand"><span class="glyphicon glyphicon-headphones"></span> Listen, Listen!</h3>
               <ul class="nav masthead-nav">
-                <li class="active"><a href="index.jsp">Home</a></li>
-                <li><a href="#">Project Description</a></li>
-                <li><a href="login.jsp">Login</a></li>
+                <li><a href="#" class="toggle-login">Login</a>
+	                <div class="login-popover">              	
+	                	<div class="login-form hide">
+		                	<form class="form-signin" role="form" name="login" method="post" action="Servlet"> 
+					        <input type="hidden" name="formType" value="login">
+					        <input type="text" name="username" class="form-control" placeholder="Username" required>
+					        <input type="password" name="password" class="form-control" placeholder="Password" required>
+					        <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+					        <p class="reg-link"><a href="register.jsp" class="register">Register</a></p>
+				      		</form>
+			      		</div>			      		
+	                </div>
+                </li>
               </ul>
             </div>
           </div>
+          
+          				
+		  
 
           <div class="inner cover">
             <h1 class="cover-heading">Listen, Listen! : The Type-What-You-Hear Game</h1>
             <p class="lead">A project by Ann Nee Lau, supervised by Dr. Jon Barker</p>
             <p class="lead">
               <a href="#" id="lm" class="btn btn-lg btn-default">Learn More</a>
-              <a href="#" id="sound" class="btn btn-lg btn-default">Click me</a>
+              
+              
             </p>
           </div>
 
@@ -55,28 +84,15 @@
 	<!--Javscript -->
 	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 	<script src="http://code.createjs.com/createjs-2013.12.12.min.js"></script>
-	<script>
-	$(document).ready(function() {
-		$("#lm").click(function(){
-			var queue = new createjs.LoadQueue();
-			 queue.installPlugin(createjs.Sound);
-			 queue.on("complete", handleComplete, this);
-			 queue.loadManifest([{id:"round1", src:"sound/from_s1.wavEN_bmn3.wav"},
-					 {id:"round2", src:"sound/prove_s1.wavEN_bab3.wav"}]);
-			 
-			 function handleComplete() {
-				 console.log("Sound files loaded!");
-			     		     
-			 }
-		});
-		
-		$("#sound").click(function(){
-			createjs.Sound.play("round2");
-			setTimeout(function(){createjs.Sound.play("round1")},3000);
-		
-		});
-	});
-	</script>
 	<script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+	<script>
+		$('.toggle-login').popover({
+			html: true,
+			content: function () {
+				return $(this).siblings().find('.login-form').html();
+			},
+			'placement': 'bottom'
+		});
+	</script>
 </body>
 </html>

@@ -8,10 +8,10 @@
 </head>
 <body>
 <%
-session.setAttribute("email", null);
-session.setAttribute("userFName", null);
+session.setAttribute("username", null);
+session.setAttribute("firstName", null);
 session.invalidate();
-response.sendRedirect("login.jsp");
+response.sendRedirect("index.jsp");
 %>
 </body>
 </html>

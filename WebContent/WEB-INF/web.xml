@@ -23,10 +23,13 @@
     <description></description>
     <display-name>GameHandler</display-name>
     <servlet-name>GameHandler</servlet-name>
-    <servlet-class>dissertation.GameHandler</servlet-class>
+    <servlet-class>gameFiles.GameHandler</servlet-class>
   </servlet>
   <servlet-mapping>
     <servlet-name>GameHandler</servlet-name>
     <url-pattern>/GameHandler</url-pattern>
   </servlet-mapping>
+  <session-config>
+    <session-timeout>60</session-timeout>
+  </session-config>
 </web-app>

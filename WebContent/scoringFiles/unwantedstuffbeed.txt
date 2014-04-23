@@ -1,0 +1,53 @@
+# British English Example Pronciation dictionary
+#
+# Version 1.0
+#
+# Friday 22 August 1997
+#
+# Commercial use is prohibited.
+# See the file README for more details
+#
+# Tony Robinson ajr@eng.cam.ac.uk
+#
+!EXCLAMATION-POINT	eh k s k l ah m ey sh ah n p oy n t
+!EXCLAMATION-POINT	eh k s k l ax m ey sh ax n p oy n t
+"DOUBLE-QUOTE		d ah b ah l k w ow t
+"DOUBLE-QUOTE		d ah b l k w ow t
+%PERCENT		p ax s eh n t
+%PERCENT		p er s eh n t
+&AMPERSAND		ae m p ax s ae n d
+&AMPERSAND		ae m p er s ae n d
+&EM			ax m
+&FLU			f l uw
+&NEATH			n iy th
+&SBLOOD			z b l ah d
+&SDEATH			z d eh th
+&TIS			t ih z
+&TWAS			t w oh z
+&TWEEN			t w iy n
+&TWERE			t w er
+&TWIXT			t w ih k s t
+'AVE			ae v
+'CAUSE			k ao z
+'COS			k oh z
+'EM			ax m
+'EMPTY			eh m p t iy
+'N			ax n
+'NEATH			n iy th
+'SHUN			sh ah n
+'SINGLE-QUOTE		s ih ng g l k w ow t
+'TIL			t ih l
+'TILDA			t ih l d ax
+'TWAS			t w oh z
+'TWEEN			t w iy n
+'TWEEN-DECKS		t w iy n d eh k s
+'TWERE			t w er
+'TWERE			t w er r
+'TWILL			t w ih l
+'TWIXT			t w ih k s t
+'TWOULD			t w uh d
+'UN			ax n
+(LEFT-PAREN		l eh f t p ae r ax n
+-SHIRE			sh ia
+<PAUSE>			sil
+<SIL>			sil sil
