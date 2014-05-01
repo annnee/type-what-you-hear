@@ -4,6 +4,9 @@ import java.io.*;
 import java.net.*;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
+
+import audioMixer.NoisyTokensGenerator;
 
 import com.google.gson.Gson;
 
@@ -16,17 +19,19 @@ public class GameServer implements Runnable {
      */
 	private int portNum;
 	public GameServer(int portNum) throws Exception{
-		this.portNum = portNum;		
+		this.portNum = portNum;
 	}
 	
 	public void createGame() throws IOException {	
 		ServerSocket socket = new ServerSocket(portNum);
-		try {	
-			System.out.println("The game server on port " + portNum + " is running.");
+		//socket.bind(new InetSocketAddress("localhost", portNum));
+		try {
+			System.out.println("The game server on port " + portNum + " is running.");		
+			
             while (true) {
-            	//if 30 seconds has elapsed and no response has been received from the client
+            	//if 20 seconds has elapsed and no response has been received from the client
     			//assume that the client has failed to connect or disconnected from the game
-    			socket.setSoTimeout(30000);
+    			socket.setSoTimeout(20000);
             	Game game = new Game();
                 Game.Player player1 = game.new Player(socket.accept(), "Player 1");
                 Game.Player player2 = game.new Player(socket.accept(), "Player 2");
@@ -72,9 +77,13 @@ public class GameServer implements Runnable {
 
 class Game {
 	
-	//rows = number of rounds (10)
-	//columns = number of players (2)
-	private String[][] responses = new String[5][2];
+	private final int NUM_OF_ROUNDS = 10;
+	private final int NUM_OF_PLAYERS = 2;
+	private final int NUM_EASY_TOKENS = 3;
+	private final int NUM_MEDIUM_TOKENS = 3;
+	private final int NUM_HARD_TOKENS = 4;
+	
+	private String[][] responses = new String[NUM_OF_ROUNDS][NUM_OF_PLAYERS];
 	
 	//have both players responded to the noisy token?
 	boolean bothAnswered = false;
@@ -85,12 +94,13 @@ class Game {
 	//number to determine if both players have finished downloading the noisy tokens
     int preloadedCount = 0;
     
-    //the correct word for the current round
-    String correctWord="";
+    boolean generated = false;
     
-    public Game() {
-    	ScoringModule.initFiles();
-    }
+    //list of players
+    ArrayList<String> players = new ArrayList<String>();
+    
+    //list of tokens
+    ArrayList<String> noisyTokens = new ArrayList<String>();
        
     public void printBoard() {
     	for (int row = 0; row<responses.length; row++) {
@@ -111,6 +121,10 @@ class Game {
     	return true;
     }
     
+    public synchronized String getAnswer(int roundNum, int index) {
+    	return responses[roundNum-1][index];
+    }
+    
     public boolean bothPlayersAnswered(int roundNum) {
     	if (!(responses[roundNum-1][0]==null || responses[roundNum-1][1]==null))
     		return true;
@@ -124,6 +138,8 @@ class Game {
                 wait();
             } catch (InterruptedException e) {}
     	}
+    	
+    	//reset to false for the next round
     	bothAnswered = false;
     }
     
@@ -142,7 +158,6 @@ class Game {
                 wait();
             } catch (InterruptedException e) {}
     	}
-    	bothPreloaded = false;
     }
     
     public synchronized void notifyThatBothHavePreloaded() {
@@ -150,32 +165,93 @@ class Game {
     	notifyAll();
     }
     
-    public synchronized void setCorrectWord(String correctWord) {
-    	this.correctWord = correctWord;
+    public synchronized void notifyGenerated() {
+    	generated = true;
+    	notifyAll();
     }
     
-    public int getScore(String userResponse, String correctAnswer) {
-    	int score = 0;
-    	
+    public synchronized void waitForGeneratedTokens() {
+    	while (!generated) {
+    		try {
+    			wait();
+    		}
+    		catch (InterruptedException e) {}
+    	}
+    }
+   
+    public double getScore(String userResponse, String correctAnswer) {
     	if (userResponse.equalsIgnoreCase(correctAnswer))
-    		score = 200;
+    		return 200.0;
     	
     	else 
-    		score = ScoringModule.computePartialScore(userResponse, correctAnswer);
-    	
-    	
-    	return score;
+    		return ScoringModule.computePartialScore(userResponse, correctAnswer); 	
     }
     
-    public void getNoisyTokens() {
-    	
-    }
-    
-   /* public String getCorrectWord() {
-    	
-    }*/
-    
+    /**
+     * Selects 3 easy, 3 medium, and 4 hard noisy tokens
+     * @param player1 username of player1
+     * @param player2 username of player2
+     */
+    public synchronized void setNoisyTokens(String player1, String player2) {
+    	ArrayList<String> noisyTokens = new ArrayList<String>();
+		double easySNR = NoisyTokensGenerator.getEasySNR();
+		double mediumSNR = NoisyTokensGenerator.getMediumSNR();
+		double hardSNR = NoisyTokensGenerator.getHardSNR();
+		int tempTotal = NUM_EASY_TOKENS;
+		
+    	try {
+			noisyTokens.addAll(DBInterface.getNoisyTokens(NUM_EASY_TOKENS, 
+					easySNR, player1, player2));
+			System.out.println("num easy tokens: " + noisyTokens.size());
+			if (noisyTokens.size()!= tempTotal) {
+				ArrayList<String> tokens = NoisyTokensGenerator.generateNoisyTokens(easySNR, 
+						tempTotal-noisyTokens.size());
+				noisyTokens.addAll(tokens);
+			}
+			
+			tempTotal += NUM_MEDIUM_TOKENS;
+			System.out.println("num easy tokens: " + noisyTokens.size());
+			noisyTokens.addAll(DBInterface.getNoisyTokens(NUM_MEDIUM_TOKENS,
+					mediumSNR, player1, player2));
+			
+			if (noisyTokens.size() != tempTotal) {
+				ArrayList<String> tokens = NoisyTokensGenerator.generateNoisyTokens(mediumSNR, 
+						tempTotal-noisyTokens.size());
+				noisyTokens.addAll(tokens);
+			}
+			
+			tempTotal += NUM_HARD_TOKENS;
+			
+			noisyTokens.addAll(DBInterface.getNoisyTokens(NUM_HARD_TOKENS,
+					hardSNR, player1, player2));			
+			if (noisyTokens.size() != tempTotal){
+				ArrayList<String> tokens = NoisyTokensGenerator.generateNoisyTokens(hardSNR, 
+						tempTotal-noisyTokens.size());
+				noisyTokens.addAll(tokens);
+			}
+			
+			Collections.shuffle(noisyTokens);
+			
+			System.out.println("Files for this game: ");
+			for (String token: noisyTokens) {
+				System.out.println(token);
+			}	
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
 
+        this.noisyTokens = noisyTokens;
+    }
+    
+    public ArrayList<String> getNoisyTokens() {
+    	return noisyTokens;
+    }
+    
+    public synchronized String getOpponent(String playerName) {   	
+    	return players.get((players.indexOf(playerName)+1)%2);
+    }
+   
+    
     /**
      * The class for the helper threads in this multithreaded server
      * application.  A Player is identified by a character mark
@@ -185,14 +261,15 @@ class Game {
      * reader and a writer.
      */
     class Player extends Thread {
-        String playerName;
+        String playerName;       
         Socket socket;
         BufferedReader input;
         PrintWriter output;
         int roundNum = 1;
-        int totalScore = 0;
         Gson gson = new Gson();
-        //ServerResponse serverResponse;
+    	double totalScore = 0;
+        double score = 0; 
+        boolean successfulGame = false;
 		
         /**
          * Constructs a handler thread for a given socket and mark
@@ -212,35 +289,45 @@ class Game {
                 String msgFromClient = input.readLine();
                 
                 //set player name
-                if (msgFromClient.startsWith("USERNAME")) 
-                	this.playerName = msgFromClient.substring(9);
-                
-                else
+                if (msgFromClient.startsWith("USERNAME")) {
+                	this.playerName = msgFromClient.substring(9).replaceAll("\r\n ", "");
+                	synchronized (this) {
+                		players.add(this.playerName);
+                	}
+                }
+                else {
                 	this.playerName = playerName;
+                }
             }
             catch (IOException e) {
-                System.out.println("Player died: " + e);
+               e.printStackTrace();
             }            
         }
 
         /**
          * The run method of this thread.
          */
-        public void run() {
+        public void run() {         
             try {
-                // The thread is only started after everyone connects.
+            	
+            	// The thread is only started after everyone connects.
                 output.println("BOTH CON");
                 
-                //after everyone connects, send players sound files
-                getNoisyTokens();
-                //dummy code, to be changed
-                ArrayList<String> noisyTokens = new ArrayList<String>();
-                noisyTokens.add("6.wav");
-        		noisyTokens.add("2.wav");
-        		noisyTokens.add("3.wav");
-        		noisyTokens.add("4.wav");
-        		noisyTokens.add("5.wav");       		
-                String soundFiles = gson.toJson(noisyTokens);
+                //only one player should retrieve noisy tokens
+                if (playerName.equals(players.get(0))) {              	
+                	setNoisyTokens(players.get(0), players.get(1));
+                	Thread.sleep(1500);
+                	notifyGenerated();
+                }
+                
+                else {
+                	waitForGeneratedTokens();           	
+                }     
+                
+                
+                
+                //send players sound files                         
+                String soundFiles = gson.toJson(getNoisyTokens());
                 
                 //send clients list of noisy tokens file names
                 output.println(soundFiles);
@@ -255,74 +342,93 @@ class Game {
                 	notifyTokensPreloaded();
                 	
                 	//if this client is the last one to finish preloading
-                	if (preloadedCount==2) {
+                	if (preloadedCount==2) 
                 		notifyThatBothHavePreloaded();
-                	}
-                	
-                	else {
-                		waitForBothToPreload();
-                	}
+                	               	
+                	else 
+                		waitForBothToPreload();              	
                 }
                 
-                output.println("The first round will start in 3 seconds. <br />");
+                output.println(getOpponent(playerName));
 
                 //continuously get the player's responses and process them.
-                while (true) {    	
+                while (true) {              	
                 	//need to get response from player
                 	String response = input.readLine();
                 	
-                	//store to makeshift board
-                	makeMove(roundNum, response);
+                	String opponentResponse = "";
+                	
+                	String playerAnswer = response.split("\t")[0];
+                	double timeTaken = Double.parseDouble(response.split("\t")[1]);
                 	
                 	//store response to database
-                	int clipID = Integer.parseInt(noisyTokens.get(roundNum-1).replace(".wav", ""));
-                	DBInterface.storeUserResponse(playerName, clipID, response);
-
-                	//wait until both players have made a move                	
+                	int clipID = Integer.parseInt(noisyTokens.get(roundNum-1).replace(".wav", "")); 	
+                	DBInterface.storeUserResponse(playerName, clipID, playerAnswer);
+                	String correctWord = DBInterface.getCorrectWord(clipID);                	
+                	
+                	//it would be easier to check if both answers are in the same category if the
+                	//time penalty is applied after performing the check
+                	score = getScore(playerAnswer, correctWord);
+                	
+                	//store player's response to a 2D array
+                	makeMove(roundNum, playerAnswer + "\t" + score);
+                	               	
                 	//if both players have answered, notify all threads
-                	//this player is the last to answer
                 	if (bothPlayersAnswered(roundNum)) {
-                		//set correct answer for this round
-                		//this is to prevent an extra call per round to the database           		
-                    	setCorrectWord(DBInterface.getCorrectWord(clipID));
-                		notifyThatBothHaveResponded();		
+                		DBInterface.updateListenCount(clipID);
+                    	notifyThatBothHaveResponded();
+                    	opponentResponse = getAnswer(roundNum, 0).split("\t")[0];
                 	}
                 	
                 	//wait until the other player has made a move before continuing
-                	//this player is the first to answer
-                	else 
-                	{	
-                		waitForBothResponses();
-                	}
-     	
-                	int score = getScore(response, correctWord);
+                	else {  
+                		DBInterface.updateListenCount(clipID);
+                		waitForBothResponses();		
+                		opponentResponse = getAnswer(roundNum, 1).split("\t")[0];
+                	}	    
+                	
+                	//check if both players' answers are in the same category
+                	double score1 = Double.parseDouble(getAnswer(roundNum, 0).split("\t")[1]);
+                	double score2 = Double.parseDouble(getAnswer(roundNum, 1).split("\t")[1]);
+                	
+                	score = score - (timeTaken*5);
+                	
+                	if (score1==score2) 
+                		score = 2 * score;                                
+                	
+                	score = (score<0) ? 0 : score;	 //make sure the score isn't negative
                 	totalScore += score;
                 	
-                	//correct answer, score, total score
-                	ServerResponse msgToClient = new ServerResponse(correctWord, score , totalScore);
+                	ServerResponse msgToClient = new ServerResponse(correctWord, score , totalScore, opponentResponse);
                 	String serverResponse = gson.toJson(msgToClient);
                 	
                 	//if this is the last round
-                	if (roundNum==responses.length)
-                	{	
-                		//append the word "last" to the correct answer to inform the client this is the last round                		
-                		msgToClient.setCorrectAnswer("LAST " + msgToClient.getCorrectAnswer());
+                	if (roundNum==responses.length) {           		
+                		//prepend the word "last" to the correct answer to inform the client this is the last round                		
+                		msgToClient.setCorrectAnswer("GAME OVER " + msgToClient.getCorrectAnswer());
+                		
+                		//player one adds his/her score to the DB first
+                		if (playerName.equals(players.get(0))) {
+                			DBInterface.insertIntoLeaderboards(playerName, (int)Math.round(totalScore));
+                			Thread.sleep(1500);
+                		}
+                		
+                		//player two adds his/her score to the DB last
+                		else {
+                			Thread.sleep(1500);
+                			DBInterface.insertIntoLeaderboards(playerName, (int)Math.round(totalScore));
+                		}
+                		
                 		serverResponse = gson.toJson(msgToClient);
                 		output.println(serverResponse);
-                		
-                		//add to leaderboards table             		
-                		DBInterface.insertIntoLeaderboards(playerName, totalScore);
-                			
+                		successfulGame = true;    		
                 		break;
                 	}
 
-                	else
-                	{	
+                	else {		
                 		output.println(serverResponse);
                 		roundNum++;
                 	}
-                	
-                	
                 }
             }
             catch (SocketTimeoutException e) {
@@ -338,6 +444,21 @@ class Game {
             } 
             finally {
             	try {
+            		//add to leaderboards table 
+            		if (successfulGame == false) {
+            			//player one adds his/her score to the DB first
+                		if (playerName.equals(players.get(0))) {
+                			DBInterface.insertIntoLeaderboards(playerName, (int)Math.round(totalScore));
+                			Thread.sleep(1500);
+                		}
+                		
+                		//player two adds his/her score to the DB last
+                		else {
+                			Thread.sleep(1500);
+                			DBInterface.insertIntoLeaderboards(playerName, (int)Math.round(totalScore));
+                		}
+            		}
+            		
             		//close the input, output, and server sockets
             		output.close();
             		input.close();            		
@@ -346,6 +467,12 @@ class Game {
             	catch (IOException e) {
             		e.printStackTrace();
             	}
+            	catch (SQLException e) {
+            		System.out.println("A database error has occurred.");
+            	} 
+            	catch (InterruptedException e) {
+					e.printStackTrace();
+				}
             }
         }
     }

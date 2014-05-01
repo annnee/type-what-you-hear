@@ -2,13 +2,15 @@ package gameFiles;
 
 public class ServerResponse {
 	private String correctAnswer;
-	private int score;
-	private int totalScore;
+	private double score;
+	private double totalScore;
+	private String opponentResponse;
 
-	public ServerResponse(String correctAnswer, int score, int totalScore) {
+	public ServerResponse(String correctAnswer, double score, double totalScore, String opponentResponse) {
 		this.correctAnswer = correctAnswer;
 		this.score = score;
 		this.totalScore = totalScore;
+		this.opponentResponse = opponentResponse;
 	}
 	
 	/**
@@ -28,29 +30,42 @@ public class ServerResponse {
 	/**
 	 * @return the score
 	 */
-	public int getScore() {
+	public double getScore() {
 		return score;
 	}
 
 	/**
 	 * @param score the score to set
 	 */
-	public void setScore(int score) {
+	public void setScore(double score) {
 		this.score = score;
 	}
 
 	/**
 	 * @return the totalScore
 	 */
-	public int getTotalScore() {
+	public double getTotalScore() {
 		return totalScore;
 	}
 
 	/**
 	 * @param totalScore the totalScore to set
 	 */
-	public void setTotalScore(int totalScore) {
+	public void setTotalScore(double totalScore) {
 		this.totalScore = totalScore;
 	}
 	
+	/**
+	 * @return the opponentResponse
+	 */
+	public String getOpponentResponse() {
+		return opponentResponse;
+	}
+
+	/**
+	 * @param opponentResponse the opponentResponse to set
+	 */
+	public void setOpponentResponse(String opponentResponse) {
+		this.opponentResponse = opponentResponse;
+	}
 }

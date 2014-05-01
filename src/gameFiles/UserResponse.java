@@ -4,11 +4,15 @@ public class UserResponse {
 	private String formType;
 	private String player;
 	private String message;
-	
-	public UserResponse(String formType, String player, String message) {
+	private String timeTaken;
+
+	public UserResponse(String formType, String player, String message,
+			String timeTaken) {
+		super();
 		this.formType = formType;
 		this.player = player;
 		this.message = message;
+		this.timeTaken = timeTaken;
 	}
 	/**
 	 * @return the formType
@@ -45,6 +49,18 @@ public class UserResponse {
 	 */
 	public void setMessage(String message) {
 		this.message = message;
+	}
+	/**
+	 * @return the timeTaken
+	 */
+	public String getTimeTaken() {
+		return timeTaken;
+	}
+	/**
+	 * @param timeTaken the timeTaken to set
+	 */
+	public void setTimeTaken(String timeTaken) {
+		this.timeTaken = timeTaken;
 	}
 	
 	

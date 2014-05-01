@@ -7,24 +7,30 @@ import java.util.Arrays;
 public class ScoringModule {
 	
 	private static RandomAccessFile phonemeRAF;
-	private static RandomAccessFile homophonesRAF;
+	private static String userDir = "";
 	
 	public static void main(String[]args) {
 		initFiles();
 	}
 
 	public static void initFiles() {
+		if (System.getProperty("user.dir").contains("Ann Nee")) 
+			userDir = "C:/Users/Ann Nee/Documents/Uni/Java/Dissertation/WebContent/";
+		
+		else {
+			userDir = "mytomcat/webapps/dissertation/";
+		}
+	
 		try {		
-			File homophonesTextFile = new File("C:\\Users\\Ann Nee\\Documents\\Uni\\Java\\Dissertation\\WebContent\\scoringFiles\\english3369_homophones.txt");
-			File phonemeTextFile = new File("C:\\Users\\Ann Nee\\Documents\\Uni\\Java\\Dissertation\\WebContent\\scoringFiles\\beep-1.0");
-			homophonesRAF = new RandomAccessFile(homophonesTextFile, "r");
+			File phonemeTextFile = new File(userDir + "scoringFiles/beep-1.0.txt");	
 			phonemeRAF = new RandomAccessFile(phonemeTextFile, "r");
 			
 		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
+	
+	
 	
 	/**
 	 * 
@@ -32,47 +38,66 @@ public class ScoringModule {
 	 * @param correctWord
 	 * @return
 	 */
-	public static int computePartialScore(String userResponse, String correctWord) {
+	public static double computePartialScore(String userResponse, String correctWord) {
 		try {
-			//check if the correct word is in the homophones text file
-			String homophone = binarySearch(homophonesRAF, correctWord);
-			
-			//if it is, return a score of 200
-			if (homophone != null && userResponse.equalsIgnoreCase(homophone)) {
-				return 200;
-			}
-			
-			//if not, look for phonemic transcription of the player's response
+			//look for phonemic transcription of the player's response
 			//and the correct answer in the phoneme library (beep-1.0)
-			else {				
-				String userAnswerPhoneme = binarySearch(phonemeRAF, userResponse);
-				String correctWordPhoneme = binarySearch(phonemeRAF, correctWord.toUpperCase());
-				
-				if (userAnswerPhoneme != null && correctWordPhoneme != null) {
-					int distance = levenshteinDistance(userAnswerPhoneme, correctWordPhoneme);
+			ArrayList<String> userAnswerPhonemes = binarySearch(phonemeRAF, userResponse);
+			ArrayList<String> correctWordPhonemes = binarySearch(phonemeRAF, correctWord.toUpperCase());
+			int distance = 100;	
+			
+			if (userAnswerPhonemes != null && correctWordPhonemes != null) {
+				for (String userAns : userAnswerPhonemes) {
+					String[] curAns =  userAns.split("\t");
+					String userPhonemes = curAns[curAns.length-1];
 					
-					//if minimal pair (differ by one phoneme)
-					//e.g. hair and fair are minimal pairs
-					if (distance==1) {
-						return 80;
-					}
-					
-					//answers differ by two phonemes
-					//e.g. 
-					else if (distance==2) {
-						return 40;
+					for (String correctAnswerPhonemes : correctWordPhonemes) {
+						String[] curCorrectAns =  correctAnswerPhonemes.split("\t");
+						String ansPhonemes = curCorrectAns[curCorrectAns.length-1];
+						
+						int tempDistance = levenshteinDistance(userPhonemes, ansPhonemes);
+									
+						if (tempDistance < distance) {
+							distance = tempDistance;				
+						}
 					}
 				}
 				
+				//if it is a homophone
+				if (distance==0) {
+					return 200.0;
+				}
+
+				//if minimal pair (differ by one phoneme)
+				//e.g. hair and fair are minimal pairs
+				if (distance==1) {
+					return 100.0;
+				}
+
+				//answers differ by two phonemes
+				else if (distance==2) {
+					return 50.0;
+				}
+
+				//differs by three phonemes
+				else if (distance==3) {
+					return 25.0;
+				}
+
+				//differs by more than three phonemes
 				else {
-					return 0;
-				}						
+					return 0.0;
+				}			
+			}
+			
+			else {
+				return 0.0;
 			}
 		}
 		catch (IOException e) {			
 			e.printStackTrace();
 		}
-		return 0;
+		return 0.0;
 	}
 	
 	/**
@@ -85,16 +110,16 @@ public class ScoringModule {
 		int distance = 0;
 		
 		//phonemes found in the correct word
-		ArrayList<String> correctWordPho = new ArrayList<String>(Arrays.asList(correctAnswer.split(" ")));
-		String[] responsePho = userResponse.split(" ");
+		ArrayList<String> correctWordPhonemes = new ArrayList<String>(Arrays.asList(correctAnswer.split(" ")));
+		String[] responsePhonemes = userResponse.split(" ");
 		
-		if (responsePho.length < correctWordPho.size()) {
-			distance += (correctWordPho.size() - responsePho.length);
+		if (responsePhonemes.length < correctWordPhonemes.size()) {
+			distance += (correctWordPhonemes.size() - responsePhonemes.length);
 		}
 		
-		for (int i = 0; i<responsePho.length; i++) {
-			if (correctWordPho.contains(responsePho[i]))
-				correctWordPho.remove(responsePho[i]);
+		for (int i = 0; i<responsePhonemes.length; i++) {
+			if (correctWordPhonemes.contains(responsePhonemes[i]))
+				correctWordPhonemes.remove(responsePhonemes[i]);
 			
 			else
 				distance += 1;
@@ -113,17 +138,30 @@ public class ScoringModule {
 	 * 			phonemic transcription of the word if it is found
 	 * @throws IOException
 	 */
-	private static String binarySearch(RandomAccessFile raf, String target)
+	private static ArrayList<String> binarySearch(RandomAccessFile raf, String target)
             throws IOException {
-
+		ArrayList<String> possibleAnswers =  new ArrayList<String>();
         raf.seek(0);
         String line = raf.readLine();
 
         if (line.compareTo(target) == 0) {
-        	String[] result = line.split("\t"); 
-        	
+        	String [] result = line.split("\t");
+    		
+    		possibleAnswers.add(line);      		
+    		
+    		//read next line
+    		line = raf.readLine();        		
+    		while (line.split("\t")[0].equalsIgnoreCase(target)) {
+    			possibleAnswers.add(line);
+    			line = raf.readLine();
+    		}
+    		
+    		for (String ans : possibleAnswers) {
+    			System.out.println("possible answer: " + ans);
+    		}
+       
         	//phonemic transcription of the word
-    		return result[result.length-1];
+    		return possibleAnswers;
         }
 
         long low = 0;
@@ -169,9 +207,17 @@ public class ScoringModule {
         	line = raf.readLine();
             
         	if (line != null && line.contains(target)) {
-        		String[] result = line.split("\t");
+
+        		possibleAnswers.add(line);
         		
-        		return result[result.length-1];
+        		//read next line
+        		line = raf.readLine();        		
+        		while (line.split("\t")[0].equalsIgnoreCase(target)) {
+        			possibleAnswers.add(line);
+        			line = raf.readLine();
+        		}
+        		
+        		return possibleAnswers;
         	}
   		
         	else

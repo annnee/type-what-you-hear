@@ -2,6 +2,7 @@ package gameFiles;
 
 import gameFiles.*;
 
+import java.io.File;
 import java.io.IOException;
 
 import javax.servlet.ServletException;
@@ -9,6 +10,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+
+import audioMixer.NoisyTokensGenerator;
 
 import com.google.gson.Gson;
 
@@ -30,7 +33,9 @@ public class GameHandler extends HttpServlet {
 	//players waiting for a game
 	private Map<String, GameClient> playersWaitingForGame = new HashMap<String, GameClient>();
 	
-	//
+	//a map of active game
+	private Map<Integer, String> activeGames = new HashMap<Integer, String>();
+	
 	private int portNum = 0;
 	
 	//
@@ -44,24 +49,21 @@ public class GameHandler extends HttpServlet {
 		try {
 			Class.forName("com.mysql.jdbc.Driver").newInstance();			
 			for (int i = 1; i<=NUM_OF_GAMES; i++) {
-				inactivePorts.add(9000+i);
-				gson = new Gson();
+				inactivePorts.add(9000+i);			
 			}
+			gson = new Gson();
+			ScoringModule.initFiles(); 
+			NoisyTokensGenerator.initFiles();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 	
-    public GameHandler() {
-        super();
-        // TODO Auto-generated constructor stub
-    }
-
 	/**
 	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
 	 */
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		
+		System.out.println(System.getProperty("user.dir"));
 	}
 
 	/**
@@ -81,9 +83,16 @@ public class GameHandler extends HttpServlet {
 			
 			GameClient newPlayer = findAMatch(username);
 			
-			//retrieve welcome message when both players are connected	
-			String welcomeMsg = newPlayer.receiveServerResponse();
-			response.getWriter().write(welcomeMsg);
+			//if the servers are full
+			if (newPlayer == null) {
+				response.getWriter().write("Sorry, the servers are full at the moment. Please come back later!");
+			}
+			
+			else {
+				//retrieve welcome message when both players are connected	
+				String welcomeMsg = newPlayer.receiveServerResponse();
+				response.getWriter().write(welcomeMsg);
+			}	
 		}
 		
 		//user either wants to receive sound files 
@@ -99,30 +108,34 @@ public class GameHandler extends HttpServlet {
 		
 		//user wants to send response (to noisy token) to server		
 		else if (message.getFormType().equals("sendResponse")) {
+			messageForServer += "\t" + message.getTimeTaken();
 			String serverResponse = sendResponse(username, messageForServer);
 			response.getWriter().write(serverResponse);
 		}	
 	}
 	
 	public synchronized GameClient findAMatch(String username) {
-		
-		GameClient newPlayer;
-		
-		//add player to list of players waiting for a game		
-		if (!playersWaitingForGame.containsKey(username)) {
-			newPlayer = new GameClient(username);
-			playersWaitingForGame.put(username, newPlayer);	
+		GameClient newPlayer = null;
+		if (inactivePorts.size()==0) {
+			return newPlayer;
 		}
 		
-		//don't create a new gameclient object if the player is already waiting for a game
-		else {
-			newPlayer = playersWaitingForGame.get(username);
-		}
-		
-		try {						
+		try {				
+			//add player to list of players waiting for a game		
+			if (!playersWaitingForGame.containsKey(username)) {
+				newPlayer = new GameClient(username);
+				playersWaitingForGame.put(username, newPlayer);	
+			}
+			
+			//don't create a new game client object if the player is already waiting for a game
+			else {
+				newPlayer = playersWaitingForGame.get(username);
+			}
+			
 			int numOfWaitingPlayers = playersWaitingForGame.size();
 			//if there are enough players, connect players together
-			if (numOfWaitingPlayers==2) {
+			if (numOfWaitingPlayers>=2) {
+				
 				//get a port number from list of inactive ports and remove it
 				portNum = inactivePorts.get(0);
 				inactivePorts.remove(0);
@@ -132,17 +145,17 @@ public class GameHandler extends HttpServlet {
 				
 				Thread.sleep(2000);
 				
-				//connect to game server		
-				newPlayer.connect(portNum);
-				
 				//let one thread know that there are enough players
 				notify();
+				
+				//connect to game server		
+				newPlayer.connect(portNum);
+				activeGames.put(portNum, username);			
 			}			
 			
 			//otherwise, wait until there are enough players
 			else {				
 				try {
-					//System.out.println(username + " is waiting for another player");
 					while(true) {			
 						wait();
 						break;
@@ -154,15 +167,18 @@ public class GameHandler extends HttpServlet {
 				
 				//connect to game server
 				newPlayer.connect(portNum);
+				
+				activeGames.put(portNum, activeGames.get(portNum)+"/"+username);
 			}
 			
 			//remove player from list of players looking for a game
 			playersWaitingForGame.remove(username);
+			
 			activePlayers.put(username, newPlayer);
-			//System.out.println("Added " + username + " to a collection of active players.");	
-					
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
+				
+		} 
+		catch (Exception e) {
+			activePlayers.remove(username);
 			e.printStackTrace();
 		}		
 		return newPlayer;
@@ -175,16 +191,14 @@ public class GameHandler extends HttpServlet {
 			GameClient curPlayer = activePlayers.get(username);
 			
 			//send response to server
-			System.out.println("Sending '" + userResponse + "' to server...");
-
 			curPlayer.makeMove(userResponse);
 
 			//receive data from server				
 			serverResponse = curPlayer.receiveServerResponse();
 
 			//if game over or there was an timeout error	
-			if (serverResponse.contains("Thank you for playing") ||
-					serverResponse.contains("timeout")) {
+			if (serverResponse.contains("GAME OVER") ||
+					serverResponse.startsWith("TIMED_OUT")) {
 				
 				//add port number back to list of inactive ports
 				int inactivePort = activePlayers.get(username).getPortNum();
@@ -192,19 +206,33 @@ public class GameHandler extends HttpServlet {
 				synchronized(inactivePorts) {
 					if (!inactivePorts.contains(inactivePort)) {
 						inactivePorts.add(inactivePort);
+						System.out.println("added port # " + inactivePort + " back to inactive ports");
 					}
 				}		
 				
 				//remove player from active players map				
 				synchronized(activePlayers) {
-					activePlayers.remove(username);	
+					activePlayers.remove(username);
 				}
 					
-				System.out.println("Removed " + username + " to a collection of active players.");			
-			}
-		} catch (Exception e) {
+				System.out.println("Removed " + username + " from a collection of active players.");
+				
+				//removes all players connected to the current game port
+				if (serverResponse.contains("TIMED_OUT")) {
+					int port = curPlayer.getPortNum();
+					
+					String[] players = activeGames.get(port).split("[/]");
+					for (int i=0;i<players.length; i++) {
+						activePlayers.remove(players[i]);
+					}		
+				}
+			}			
+		}
+		
+		catch (Exception e) {
 			e.printStackTrace();
 		}
+			
 		//send data back to client
 		return serverResponse;
 	}

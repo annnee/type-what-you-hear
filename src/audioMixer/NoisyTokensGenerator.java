@@ -7,55 +7,70 @@ import database.DBInterface;
 
 public class NoisyTokensGenerator {
 	private static Random randomGen = new Random();
-	private static String userDir = System.getProperty("user.dir");
+
+	private static String userDir = "";
 	
-	/*private static final double EASY_BAB = 0;
-	private static final double MEDIUM_BAB = -7.5;
-	private static final double HARD_BAB = -15.0;*/
+	private static ArrayList<String> wordFiles;
+	private static ArrayList<String> noiseFiles;
 	
-	private static final double EASY = 0;
-	private static final double MEDIUM = -6.0;
-	private static final double HARD = -12.0;
+	//{easy SNR, medium SNR, hard SNR}
+	private static final double[] SNR = {15.0, 5.0, 0.0}; 
 	
-	public static void main(String[] args) throws Exception {
-		/*generateToken(EASY, selectRandomFile(getWordFileNames()), "EN_ssn.wav");
-		generateToken(MEDIUM, selectRandomFile(getWordFileNames()), "EN_ssn.wav");
-		generateToken(HARD, selectRandomFile(getWordFileNames()), "EN_ssn.wav");
-				
-		generateToken(EASY, selectRandomFile(getWordFileNames()), "EN_bmn8.wav");
-		generateToken(MEDIUM, selectRandomFile(getWordFileNames()), "EN_bmn8.wav");
-		generateToken(HARD, selectRandomFile(getWordFileNames()), "EN_bmn8.wav");
-				
-		generateToken(EASY, selectRandomFile(getWordFileNames()), "EN_bab8.wav");
-		generateToken(MEDIUM, selectRandomFile(getWordFileNames()), "EN_bab8.wav");
-		generateToken(HARD, selectRandomFile(getWordFileNames()), "EN_bab8.wav");
+	public static void main(String[] args) throws Exception {		
+		/*long startTime = System.nanoTime();
+		initFiles();
+		long endTime = System.nanoTime();
+		long duration = endTime - startTime;
+		System.out.println(duration/1000000 + " milliseconds");
 		
-		generateToken(EASY, selectRandomFile(getWordFileNames()), "EN_revbab8.wav");
-		generateToken(MEDIUM, selectRandomFile(getWordFileNames()), "EN_revbab8.wav");
-		generateToken(HARD, selectRandomFile(getWordFileNames()), "EN_revbab8.wav");*/
+		generateNoisyTokens(15, 3);
+		generateNoisyTokens(4, 3);
+		generateNoisyTokens(-1, 3);*/
+	}
+	
+	public static void initFiles() {
+		if (System.getProperty("user.dir").contains("Ann Nee")) 
+			userDir = "C:/Users/Ann Nee/Documents/Uni/Java/Dissertation/WebContent/";
+		
+		else {
+			userDir = "mytomcat/webapps/dissertation/";
+		}
+		
+		wordFiles = getWordFileNames();
+		noiseFiles = getNoiseFileNames();
+	}	
+	
+	public static double getEasySNR() {
+		return SNR[0];
+	}
+	
+	public static double getMediumSNR() {
+		return SNR[1];
+	}
+	
+	public static double getHardSNR() {
+		return SNR[2];
 	}
 	
 	/**
-	 * Generates 4 'easy', 3 'medium', and 3 'difficult' noisy tokens 
-	 * @param words
-	 * @param noises
-	 * @return a list of noisy tokens
+	 * Generates a user-specified number of noisy tokens 
+	 * @param SNR
+	 * @param counter
+	 * @return
 	 */
-	public static ArrayList<String> generateNoisyTokens(ArrayList<String> words, ArrayList<String> noises) {
-		//shuffle both lists and get one item from each list
+	public static ArrayList<String> generateNoisyTokens(double SNR, int counter) {
+		ArrayList<String> tokens = new ArrayList<String>();
+		if (counter < 0) {
+			return tokens;
+		}
+		Collections.shuffle(wordFiles);
+		Collections.shuffle(noiseFiles);
 		
-		
-		//check if this particular combination exists
-		
-		
-		//mix them with the current difficulty
-		
-		
-		//add to list of noisy tokens
-		
-		
-		//to be replaced with an array that contains the noisy tokens
-		return null;
+		for (int i=0; i<counter; i++) {
+			tokens.add(generateToken(SNR, wordFiles.get(i), noiseFiles.get(i)));
+		}
+		// add to list of noisy tokens	
+		return tokens;
 	}
 	
 	/**
@@ -63,13 +78,12 @@ public class NoisyTokensGenerator {
 	 * @return an array containing all the file names
 	 */
 	private static ArrayList<String> getWordFileNames() {
-		// Directory path here		
-		String wordsFilePath = userDir + "\\soundFiles\\Words";
+		// Directory path here	
+		String wordsFilePath = userDir + "/soundFiles/Words";
 		
 		File wordsFolder = new File(wordsFilePath);
 		File[] wordsFiles = wordsFolder.listFiles();
 		String[] wordsFileNames = new String[wordsFiles.length];
-		
 		for (int i = 0; i < wordsFiles.length; i++) {
 			wordsFileNames[i] = wordsFiles[i].getName();
 		}
@@ -82,7 +96,7 @@ public class NoisyTokensGenerator {
 	 * @return an array containing all the file names
 	 */
 	private static ArrayList<String> getNoiseFileNames() {
-		String noiseFilePath = userDir + "\\soundFiles\\Noise";
+		String noiseFilePath = userDir + "/soundFiles/Noise";
 		
 		File noiseFolder = new File(noiseFilePath);
 		File[] noiseFiles = noiseFolder.listFiles();
@@ -95,16 +109,6 @@ public class NoisyTokensGenerator {
 		return new ArrayList<String>(Arrays.asList(noiseFileNames));
 	}
 	
-	/**
-	 * Select a random file
-	 * @param fileNamesArray
-	 * @return randomly selected file
-	 */
-	public static String selectRandomFile(ArrayList<String> fileNamesArray) {
-		
-		int ranNum = randomGen.nextInt(fileNamesArray.size());
-		return fileNamesArray.get(ranNum);
-	}
 	
 	private static double computeRMS(double[] buffer) {
 		double rms = 0;
@@ -124,17 +128,20 @@ public class NoisyTokensGenerator {
 	 * @param wordFilename
 	 * @param noiseFilename
 	 */
-	public static void generateToken(double desiredSNR, String wordFilename, String noiseFilename) {
+	private static String generateToken(double desiredSNR, String wordFilename, String noiseFilename) {
+		String mixedFilename = "";
 		try {
 			//get auto_increment value from DB - this will be the filename of the noisy token
-			String mixedFilename = DBInterface.getTokenAutoIncVal();
+			mixedFilename = DBInterface.getTokenAutoIncVal()+".wav";
+			//mixedFilename = wordFilename + " " + noiseFilename + " " + desiredSNR + ".wav";
+			File wordFile = new File(userDir + "/soundFiles/Words/" + wordFilename);
+			File noiseFile = new File(userDir + "/soundFiles/Noise/" + noiseFilename);
+			File mixedFile = new File(userDir + "/sound/" + mixedFilename);
 			
-			File wordFile = new File(userDir + "\\soundFiles\\Words\\" + wordFilename);
-			File noiseFile = new File(userDir + "\\soundFiles\\Noise\\" + noiseFilename);
-			File mixedFile = new File(userDir + "/WebContent/sound/" +mixedFilename+ ".wav");
-			
-			String word = wordFilename.split("_")[0];
 			String noise = noiseFilename.split("_")[1];
+			noise = noise.substring(0, noise.length()-4); //remove the ".wav" part
+			String word = wordFilename.substring(0, wordFilename.length()-4);
+			
 			
 			//open the wav files
 			WavFile wavWordFile = WavFile.openWavFile(wordFile);
@@ -180,20 +187,15 @@ public class NoisyTokensGenerator {
 				noiseBufferSegment[i] = noiseBuffer[i+noiseOffset];
 			}
 			
+			
 			// Compute RMS for speech and noise signals
 			double speechRMS = computeRMS(wordBuffer);
 			double noiseRMS = computeRMS(noiseBufferSegment);
 			
-			//normalize the noise signal
-			for (int i = 0; i<noiseBufferSegment.length; i++) {
-				noiseBufferSegment[i] = noiseBufferSegment[i]/noiseRMS * speechRMS;				
-			}
-			
-			// Adjust the SNR of the noisy token
-			double c = (speechRMS/noiseRMS)*Math.pow(10, (-desiredSNR/20));			
+			// Adjust the noisiness of the noise signal
+			double c = (speechRMS/noiseRMS)*Math.pow(10, (-desiredSNR/20));
 			for (int i = 0; i<noiseBufferSegment.length; i++) {
 				noiseBufferSegment[i] = noiseBufferSegment[i]*c;
-				
 			}
 
 			// Create a wav file with the name specified as the first argument
@@ -201,40 +203,39 @@ public class NoisyTokensGenerator {
 			
 			// Buffer for the mixed wav file
 			double[] buffer = new double[numSpeechFrames];
-
-			// Initialise a local frame counter
-			long frameCounter = 0;
+			double max = 0.0;
 			
-			// Loop until all frames written
-			while (frameCounter < numSpeechFrames)
+			// Fill the buffer
+			for (int s = 0 ; s < buffer.length; s++)
 			{
-				// Determine how many frames to write, up to a maximum of the buffer size
-				long remaining = mixedWavFile.getFramesRemaining();
-				int toWrite = (remaining > numSpeechFrames) ? numSpeechFrames : (int) remaining;
-
-				// Fill the buffer
-				for (int s=0 ; s<toWrite ; s++, frameCounter++)
-				{
-					buffer[s] = wordBuffer[s] + noiseBufferSegment[s];				
-				}				
-
-				// Write the buffer
-				mixedWavFile.writeFrames(buffer, toWrite);
+				buffer[s] = wordBuffer[s] + noiseBufferSegment[s];
+				if (buffer[s]>1.0) {
+					max = buffer[s];
+				}	
 			}
 			
+			//scale the signal exceeds the max value
+			if (max!=0.0) {
+				for (int s = 0 ; s < buffer.length; s++)
+				{
+					buffer[s] = buffer[s]*0.99/max;
+				}
+			}
+			
+			// Write the buffer
+			mixedWavFile.writeFrames(buffer, numSpeechFrames);
+						
 			// Close the wav files
 			wavWordFile.close();
 			wavNoiseFile.close();
 			mixedWavFile.close();
 			
 			//add info to database
-			DBInterface.storeTokenInfo(word, noise, desiredSNR, noiseOffset);
-			
+			DBInterface.storeTokenInfo(word, noise, desiredSNR, noiseOffset);		
 		}
 		catch (Exception e) {
 			e.printStackTrace();
 		}
-	}
-	
-	
+		return mixedFilename;
+	}	
 }

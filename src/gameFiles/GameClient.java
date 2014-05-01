@@ -19,38 +19,37 @@ public class GameClient {
      * @return
      * @throws IOException
      */
-	public String connect(int portNum) throws IOException{
-		String connectStatus = "success";
+	public void connect(int portNum) throws Exception{
 		try {
-			System.out.println(username + " is connecting to port " + portNum);
+			
 	    	// Setup networking
 	        socket = new Socket("localhost", portNum);
+	        //socket = new Socket("tomcat.dcs.shef.ac.uk:41532", portNum);
 	        
-	        //if 30 seconds has elapsed and no response has been received from the client
+	        //if 20 seconds has elapsed and no response has been received from the client
 			//assume that the server has shut down
-	        socket.setSoTimeout(30000);
+	        socket.setSoTimeout(20000);
 	        
 	        in = new BufferedReader(new InputStreamReader(
 	            socket.getInputStream()));
 	        out = new PrintWriter(socket.getOutputStream(), true);
 	        out.println("USERNAME " + username);
+	        System.out.println(username + " has connected to port " + getPortNum());
+	        
 		}
 		catch (SocketTimeoutException e) {
-			connectStatus = "timeout";
 			System.out.println("No response from server for 30 seconds.");
 			System.out.println("Disconnected from game server.");
 			socket.close();
 		}
 		catch(IOException e) {
-			connectStatus = "timeout";
 			e.printStackTrace();
 			socket.close();
 		}
-		return connectStatus;
 	}
 	
 	public int getPortNum() {
-		return socket.getLocalPort();
+		return socket.getPort();
 	}
 	
 	public String receiveServerResponse () {
@@ -60,12 +59,12 @@ public class GameClient {
 		}	
 		catch (SocketTimeoutException e) {
 			System.out.println("No response from server for 30 seconds.");
-			return "timeout";
+			return "TIMED_OUT\t"+getPortNum();
 		}
 		
 		catch (IOException e) {
 			e.printStackTrace();
-			return "timeout";
+			return "TIMED_OUT\t"+getPortNum();
 		}
 		
 		return serverResponse;

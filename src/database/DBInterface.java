@@ -2,25 +2,27 @@ package database;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Collections;
 
-import dissertation.User;
+import accounts.User;
+import audioMixer.NoisyTokensGenerator;
 
 public class DBInterface {
 
 	// Declare the connection settings strings:	
 	//database login credentials
-	private static final String server = "stusql.dcs.shef.ac.uk";
-	private static final String database = "acb11anl";
-	private static final String username = "acb11anl";
-	private static final String password = "28b4b874 ";
+	private static final String server = DBCredentials.getServer();
+	private static final String database = DBCredentials.getDatabase();
+	private static final String username = DBCredentials.getUsername();
+	private static final String password = DBCredentials.getPassword();
 	
 	public static void main (String[]args) {
-		try {
-			System.out.println(getTokenAutoIncVal());
+		/*try {
+			insertIntoLeaderboards("AAAAAAAAAA", 1001);
+			 
 		} catch (SQLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+		}*/
 	}
 	
 	/**
@@ -98,16 +100,14 @@ public class DBInterface {
 			conn = openConnection(conn);
 
 			// The SQL query for registering for an account
-			String query = "INSERT INTO Accounts(username, pword, fName, lName, birthday, gender, hearingImpaired)";
-			query += " VALUES (?, PASSWORD(?), ?, ?, ?, ?, ?);";
+			String query = "INSERT INTO Accounts(username, pword, birthday, gender, hearingImpaired)";
+			query += " VALUES (?, PASSWORD(?), ?, ?, ?);";
 			stat = conn.prepareStatement(query);
 			stat.setString(1, user.getUsername());
 			stat.setString(2, user.getPassword());
-			stat.setString(3, user.getfName());
-			stat.setString(4, user.getlName());
-			stat.setDate(5, user.getBirthday());
-			stat.setString(6, user.getGender());
-			stat.setString(7, user.getHearingImpaired());
+			stat.setDate(3, user.getBirthday());
+			stat.setString(4, user.getGender());
+			stat.setString(5, user.getHearingImpaired());
 
 			// Execute the query
 			stat.executeUpdate();
@@ -125,7 +125,7 @@ public class DBInterface {
 	 * Creates a new player profile when the user registers for an account
 	 * @param user
 	 */
-	public static void createNewPlayerProfile(User user) throws SQLException {
+	/*public static void createNewPlayerProfile(User user) throws SQLException {
 		Connection conn = null;
 		PreparedStatement stat = null;
 
@@ -133,23 +133,21 @@ public class DBInterface {
 			conn = openConnection(conn);
 
 			// The query for creating a new player profile
-			String query = "INSERT INTO PlayerProfile(username, fName, lName) VALUES (?, ?, ?);";
+			String query = "INSERT INTO PlayerProfile(username) VALUES (?);";
 			stat = conn.prepareStatement(query);
-			stat.setString(1, user.getUsername());
-			stat.setString(2, user.getfName());
-			stat.setString(3, user.getlName());			
+			stat.setString(1, user.getUsername());			
 
 			// Execute the query
 			stat.executeUpdate(); 
 		}
-		catch (SQLException ex){
+		catch (SQLException ex) {
 			throw ex;
 		}
 		finally {
 			closeStatement(stat);
 			closeConnection(conn);
 		}
-	}
+	}*/
 
 	/**
 	 * Checks whether the username already exists in the database
@@ -200,10 +198,10 @@ public class DBInterface {
 
 		try {
 			conn = openConnection(conn);
-			String userFName;
+			String user;
 
 			// The query for logging in
-			String query = "SELECT fName FROM Accounts WHERE username = ? and pword = PASSWORD(?);";					
+			String query = "SELECT username FROM Accounts WHERE username = ? and pword = PASSWORD(?);";					
 			stat = conn.prepareStatement(query);
 			stat.setString(1, username);
 			stat.setString(2, password);
@@ -211,12 +209,12 @@ public class DBInterface {
 			// Execute the query
 			ResultSet rs = stat.executeQuery();
 			if (rs.next()) 	
-				userFName = rs.getString("fName");
+				user = rs.getString("username");
 
 			else 
-				userFName = null;
+				user = null;
 
-			return userFName;
+			return user;
 		}
 		catch (SQLException ex){
 			throw ex;	
@@ -270,31 +268,49 @@ public class DBInterface {
 	 * @return an array list of noisy tokens
 	 * @throws SQLException
 	 */
-	public static ArrayList<Integer> getNoisyTokens(String player1, String player2) throws SQLException {
+	public static ArrayList<String> getNoisyTokens(int numTokens, double SNR, String player1, String player2) throws SQLException {
 		Connection conn = null;
 		PreparedStatement stat = null;
 
 		try {
 			conn = openConnection(conn);
-			ArrayList<Integer> noisyTokens = new ArrayList<Integer>();
-
-			// The query for selecting the noisy tokens
-			String query = "select NoisyTokens.clipID from NoisyTokens LEFT OUTER JOIN"
+			ArrayList<String> noisyTokens = new ArrayList<String>();
+			
+			// The query for selecting the noisy tokens that the players have already listened to
+			String query = "SELECT DISTINCT NoisyTokens.clipID from NoisyTokens LEFT OUTER JOIN "
 					+ "UsersResponses ON NoisyTokens.clipID = UsersResponses.clipID WHERE "
-					+ "(NoisyTokens.listenCount < 15) AND ((UsersResponses.username IS null) OR "
-					+ "(UsersResponses.username <> ? AND UsersResponses.username <> ?))";
+					+ "(UsersResponses.username = ? OR UsersResponses.username = ?) AND SNR = ? ;";
 			stat = conn.prepareStatement(query);
 			stat.setString(1, player1);
-			stat.setString(2, player2); 
+			stat.setString(2, player2);
+			stat.setDouble(3, SNR);
 
 			// Execute the query
 			ResultSet rs = stat.executeQuery();
-
-			while (rs.next()) {
-
-				noisyTokens.add(rs.getInt("clipID"));
+			
+			// Select tokens that neither players have heard before
+			query = "SELECT clipID FROM NoisyTokens WHERE (listenCount < 15) AND "
+					+ "(SNR = ?)";		
+			
+			if (rs.next()) {
+				query += " AND (clipID <> " + rs.getInt("NoisyTokens.clipID");
+				while (rs.next()) {
+					query += " AND clipID <> " + rs.getInt("NoisyTokens.clipID");
+				}
+				query += ")";
 			}
-
+			
+			query += " LIMIT ?;";
+			stat = conn.prepareStatement(query);
+			stat.setDouble(1, SNR);
+			stat.setInt(2, numTokens);
+			
+			ResultSet resSet = stat.executeQuery();
+			
+			while (resSet.next()) {
+				noisyTokens.add(resSet.getInt("clipID")+".wav");
+			}
+			
 			return noisyTokens;
 		}
 		catch (SQLException ex){
@@ -328,8 +344,26 @@ public class DBInterface {
 			stat.setString(3, response);
 			stat.executeUpdate();
 
+		}
+		catch (SQLException ex){
+			throw ex;
+
+		}
+		finally {
+			closeStatement(stat);
+			closeConnection(conn);
+		}
+	}
+	
+	public static void updateListenCount(int clipID) throws SQLException{
+		Connection conn = null;
+		PreparedStatement stat = null;
+
+		try {
+			conn = openConnection(conn);
+			
 			// Query for updating listen count in the NoisyTokens table
-			query = "SELECT listenCount FROM NoisyTokens WHERE clipID = ?;";
+			String query = "SELECT listenCount FROM NoisyTokens WHERE clipID = ?;";
 			stat = conn.prepareStatement(query);
 			stat.setInt(1, clipID);
 
@@ -342,9 +376,7 @@ public class DBInterface {
 				stat.setInt(1, updatedCount);
 				stat.setInt(2, clipID);
 				stat.executeUpdate();
-			}
-
-			
+			}			
 		}
 		catch (SQLException ex){
 			throw ex;
@@ -367,31 +399,29 @@ public class DBInterface {
 		PreparedStatement stat = null;
 
 		try {
+			System.out.println("sending score to DB");
 			conn = openConnection(conn);
 			
 			// Display only 15 high scores in the leaderboards table
 			final int MAX_HIGH_SCORES = 15;
 			int numHighScores = 0;
 			int lowestHighScore = 9999999;
-			String lowestHighScorePlayer = "";
 			String query = "SELECT * FROM Leaderboards;";
 			stat = conn.prepareStatement(query);
 			ResultSet rs = stat.executeQuery();
 
 			// Get lowest high score & username of player with the lowest score
 			while (rs.next()) {
-				numHighScores++;
+				numHighScores++; 
 				int curScore = rs.getInt("score");
 				lowestHighScore = (curScore < lowestHighScore) ? curScore: lowestHighScore;
-				if (curScore < lowestHighScore) {
-					lowestHighScore = curScore;
-					lowestHighScorePlayer = rs.getString("username");
-				}
+				if (curScore < lowestHighScore) 
+					lowestHighScore = curScore;							
 			}
 
 			// If number of high scores < max num of high scores
 			if (numHighScores<MAX_HIGH_SCORES) {
-				
+				System.out.println("adding high score!");
 				// Query for adding score to leaderboards
 				query = "INSERT INTO Leaderboards(username, score) VALUES(?, ?);";
 				stat = conn.prepareStatement(query);
@@ -405,18 +435,18 @@ public class DBInterface {
 			// If the score to be added is high enough
 			// Replace this high score with the lowest high score
 			else if (numHighScores == MAX_HIGH_SCORES && score > lowestHighScore ) {
-				
+				System.out.println("new high score!!");
 				// Query for removing lowest high score 
-				query = "DELETE FROM Leaderboards WHERE username = ? AND score = ?;";
+				query = "DELETE FROM Leaderboards WHERE score = ? LIMIT 1;";
 				stat = conn.prepareStatement(query);
-				stat.setString(1, lowestHighScorePlayer);
-				stat.setInt(2, lowestHighScore);
+				stat.setInt(1, lowestHighScore);
 				
 				// Execute the query
 				stat.executeUpdate();
-
+				
 				// Query for inserting new high score
 				query = "INSERT INTO Leaderboards(username, score) VALUES(?, ?);";
+				stat = conn.prepareStatement(query);
 				stat.setString(1, username);
 				stat.setInt(2, score);
 				
@@ -455,7 +485,7 @@ public class DBInterface {
 			stat = conn.prepareStatement(query);
 			stat.setString(1, word);
 			stat.setString(2, noiseType);
-			stat.setDouble(3, SNR);
+			stat.setFloat(3, (float)SNR);
 			stat.setInt(4, offset);
 			
 			// Execute the query
@@ -497,12 +527,5 @@ public class DBInterface {
 			closeStatement(stat);
 			closeConnection(conn);
 		}
-	}
-	
-	/**
-	 * 
-	 */
-	public static void doesTokenExist() {
-		
-	}
+	}	
 }
